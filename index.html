@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<title>결 — 지금 이 순간</title>
+<meta name="theme-color" content="#12100e" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="결" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<link rel="icon" href="icon.svg" />
+<style>
+  :root{
+    --bg:#faf7f2; --surface:#ffffff; --surface-2:#f3eee6; --line:#e6ded1;
+    --text:#241f1a; --muted:#8a7f70; --faint:#b6ab99;
+    --pain:#d8663d; --pain-soft:#f7e4d9; --pain-ink:#8f3c1c;
+    --joy:#3a9d8f; --joy-soft:#dcefe9; --joy-ink:#1f6b60;
+    --shadow:0 1px 2px rgba(40,30,20,.04),0 8px 24px rgba(40,30,20,.06);
+    --r:16px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12100e; --surface:#1c1916; --surface-2:#241f1a; --line:#2f2a24;
+      --text:#efe8dd; --muted:#9c9184; --faint:#6b6157;
+      --pain:#e77a52; --pain-soft:#33231b; --pain-ink:#f0a583;
+      --joy:#4fb3a3; --joy-soft:#16302c; --joy-ink:#84d1c4;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.5;
+    padding-bottom:calc(72px + env(safe-area-inset-bottom));
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:0 18px}
+  header.top{padding:calc(env(safe-area-inset-top) + 20px) 18px 8px;max-width:520px;margin:0 auto}
+  header.top h1{font-size:20px;margin:0;letter-spacing:-.02em;font-weight:700;display:flex;align-items:center;gap:8px}
+  header.top .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .dot{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--pain),var(--joy))}
+
+  section{display:none;animation:fade .25s ease}
+  section.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* HOME */
+  .choose{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}
+  .choose button{
+    border:1px solid var(--line);border-radius:22px;padding:34px 16px;min-height:184px;
+    background:var(--surface);box-shadow:var(--shadow);cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .choose button:active{transform:scale(.97)}
+  .choose .em{font-size:44px;line-height:1}
+  .choose .lb{font-size:22px;font-weight:700;letter-spacing:-.01em}
+  .choose .ds{font-size:12px;color:var(--muted);text-align:center;max-width:15ch}
+  .choose .pain{border-color:color-mix(in srgb,var(--pain) 35%,var(--line))}
+  .choose .pain .lb{color:var(--pain-ink)}
+  .choose .joy{border-color:color-mix(in srgb,var(--joy) 35%,var(--line))}
+  .choose .joy .lb{color:var(--joy-ink)}
+  .todayline{margin-top:24px;text-align:center;color:var(--muted);font-size:13px}
+  .todayline b{color:var(--text);font-weight:600}
+  .whisper{margin-top:30px;padding:16px 18px;border-radius:var(--r);background:var(--surface-2);
+    color:var(--muted);font-size:13px;line-height:1.6;border:1px solid var(--line)}
+  .whisper b{color:var(--text);font-weight:600}
+
+  /* RECORD */
+  .rhead{display:flex;align-items:center;gap:10px;margin:18px 0 6px}
+  .rhead .badge{font-weight:700;font-size:16px;padding:6px 14px;border-radius:999px}
+  .rhead.pain .badge{background:var(--pain-soft);color:var(--pain-ink)}
+  .rhead.joy .badge{background:var(--joy-soft);color:var(--joy-ink)}
+  .rhead .back{margin-left:auto;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:8px}
+
+  .field{margin-top:22px}
+  .field > label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px;letter-spacing:.01em}
+  .field .opt{color:var(--faint);font-weight:400}
+
+  /* intensity */
+  .intbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 16px 14px;box-shadow:var(--shadow)}
+  .intnum{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1}
+  .intzone{font-size:18px;font-weight:700;margin-left:8px}
+  .intphrase{color:var(--muted);font-size:14px;margin-top:6px;min-height:20px}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;margin:18px 0 4px;background:var(--surface-2)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:50%;background:var(--surface);border:2px solid currentColor;box-shadow:0 2px 6px rgba(0,0,0,.18);cursor:pointer}
+  .ticks{display:flex;justify-content:space-between;color:var(--faint);font-size:10px;padding:0 2px}
+  .pain .intnum,.pain .intzone,.pain input[type=range]{color:var(--pain)}
+  .joy  .intnum,.joy .intzone,.joy input[type=range]{color:var(--joy)}
+  .pain .intzone{color:var(--pain-ink)} .joy .intzone{color:var(--joy-ink)}
+
+  /* chips */
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid var(--line);background:var(--surface);color:var(--text);
+    padding:9px 14px;border-radius:999px;font-size:14px;cursor:pointer;transition:.12s;user-select:none}
+  .chip:active{transform:scale(.95)}
+  .chip.on{border-color:transparent;font-weight:600}
+  .pain .chip.on{background:var(--pain);color:#fff}
+  .joy  .chip.on{background:var(--joy);color:#fff}
+  .chip.mood{font-size:22px;padding:8px 12px;line-height:1}
+  .chip.mood.on{background:var(--surface-2);border-color:currentColor}
+
+  textarea{width:100%;border:1px solid var(--line);background:var(--surface);color:var(--text);
+    border-radius:14px;padding:12px 14px;font:inherit;resize:none;min-height:52px}
+  textarea:focus{outline:none;border-color:var(--muted)}
+
+  .seg{display:flex;gap:8px;background:var(--surface-2);padding:4px;border-radius:12px}
+  .seg button{flex:1;border:none;background:none;color:var(--muted);padding:9px;border-radius:9px;font:inherit;font-size:13px;cursor:pointer}
+  .seg button.on{background:var(--surface);color:var(--text);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .hint{font-size:12px;color:var(--faint);margin-top:8px;line-height:1.5}
+
+  .savebar{position:sticky;bottom:calc(72px + env(safe-area-inset-bottom));margin-top:26px;padding:14px 0 4px;background:linear-gradient(to top,var(--bg) 60%,transparent)}
+  .btn{width:100%;border:none;border-radius:16px;padding:16px;font:inherit;font-size:16px;font-weight:700;cursor:pointer;transition:.12s}
+  .btn:active{transform:scale(.98)}
+  .pain .btn.save{background:var(--pain);color:#fff}
+  .joy  .btn.save{background:var(--joy);color:#fff}
+  .btn.ghost{background:var(--surface-2);color:var(--muted);font-weight:600;font-size:14px;padding:12px;margin-top:8px}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
+    background:var(--text);color:var(--bg);padding:12px 20px;border-radius:999px;font-size:14px;font-weight:600;
+    opacity:0;pointer-events:none;transition:.28s;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* REPORT */
+  h2.rt{font-size:15px;font-weight:700;margin:26px 0 12px;letter-spacing:-.01em}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:12px}
+  .stat{display:flex;align-items:baseline;gap:10px}
+  .stat .big{font-size:34px;font-weight:800;letter-spacing:-.02em}
+  .stat .unit{color:var(--muted);font-size:14px}
+  .stat .goal{margin-left:auto;font-size:12px;color:var(--muted);text-align:right}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
+  .pill.ok{background:var(--joy-soft);color:var(--joy-ink)}
+  .pill.no{background:var(--pain-soft);color:var(--pain-ink)}
+  .split{display:flex;gap:8px;margin-top:6px}
+  .split .seg2{height:10px;border-radius:99px}
+  .barrow{display:flex;align-items:center;gap:10px;margin:9px 0;font-size:13px}
+  .barrow .nm{width:38%;flex:none;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .barrow .track{flex:1;height:9px;background:var(--surface-2);border-radius:99px;overflow:hidden}
+  .barrow .fill{height:100%;border-radius:99px}
+  .barrow.pain .fill{background:var(--pain)} .barrow.joy .fill{background:var(--joy)}
+  .barrow .vv{color:var(--muted);font-size:12px;width:44px;text-align:right;flex:none}
+  .locked{position:relative;text-align:center;padding:26px 18px;color:var(--muted)}
+  .locked .lk{font-size:26px}
+  .locked b{color:var(--text)}
+  .prog{height:8px;background:var(--surface-2);border-radius:99px;margin:12px auto 0;max-width:220px;overflow:hidden}
+  .prog .fill{height:100%;background:var(--joy);border-radius:99px}
+  .heat{display:grid;grid-template-columns:auto repeat(4,1fr);gap:5px;font-size:11px}
+  .heat .hh{color:var(--faint);text-align:center;padding-bottom:2px}
+  .heat .rl{color:var(--muted);display:flex;align-items:center}
+  .heat .cell{aspect-ratio:1.6;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--text);font-weight:600;background:var(--surface-2)}
+  .empty{color:var(--faint);font-size:13px;text-align:center;padding:18px}
+  .muted-s{color:var(--muted);font-size:12px;margin-top:2px}
+
+  /* DATA */
+  .rowlist{display:flex;flex-direction:column;gap:8px}
+  .rec{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;cursor:pointer}
+  .rec .ic{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;font-size:14px}
+  .rec.pain .ic{background:var(--pain-soft);color:var(--pain-ink)}
+  .rec.joy .ic{background:var(--joy-soft);color:var(--joy-ink)}
+  .rec .meta{flex:1;min-width:0}
+  .rec .t1{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rec .t2{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rec .flag{font-size:10px;color:var(--faint)}
+  .dbtn{display:flex;gap:10px;margin:8px 0 4px}
+  .dbtn button{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:12px;padding:12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  .danger{color:var(--pain-ink);border-color:color-mix(in srgb,var(--pain) 30%,var(--line))!important}
+
+  /* NAV */
+  nav{position:fixed;bottom:0;left:0;right:0;background:color-mix(in srgb,var(--surface) 88%,transparent);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom);z-index:40}
+  nav .inner{max-width:520px;margin:0 auto;display:flex}
+  nav button{flex:1;background:none;border:none;color:var(--muted);padding:11px 0 9px;font:inherit;font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+  nav button .ni{font-size:20px;line-height:1}
+  nav button.on{color:var(--text)}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1><span class="dot"></span> 결 <span style="font-weight:400;color:var(--muted);font-size:14px">지금 이 순간</span></h1>
+</header>
+
+<!-- HOME -->
+<section id="home" class="active">
+  <div class="wrap">
+    <div class="choose">
+      <button class="pain" onclick="startRecord('고통')">
+        <span class="em">🌑</span><span class="lb">고통</span>
+        <span class="ds">지금 나를 붙든 것</span>
+      </button>
+      <button class="joy" onclick="startRecord('기쁨')">
+        <span class="em">☀️</span><span class="lb">기쁨</span>
+        <span class="ds">스쳐가는 괜찮은 순간</span>
+      </button>
+    </div>
+    <div class="todayline" id="todayline"></div>
+    <div class="whisper">
+      고통은 스스로 기록되기를 요구하지만, <b>스침은 잡아야 남습니다.</b><br>
+      1~2점짜리 작은 순간도 기록 대상입니다. 놓친 날은 그냥 비워두세요.
+    </div>
+  </div>
+</section>
+
+<!-- RECORD -->
+<section id="record">
+  <div class="wrap">
+    <div class="rhead" id="rhead">
+      <span class="badge" id="rbadge"></span>
+      <span class="muted-s" id="rsubtitle"></span>
+      <button class="back" onclick="go('home')">✕ 닫기</button>
+    </div>
+
+    <div class="field">
+      <label>강도 <span class="opt">· 필수</span></label>
+      <div class="intbox">
+        <div><span class="intnum" id="intnum">5</span><span class="intzone" id="intzone"></span></div>
+        <div class="intphrase" id="intphrase"></div>
+        <input type="range" min="1" max="10" step="1" value="5" id="intslider" oninput="onSlide()" />
+        <div class="ticks"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div>
+      </div>
+      <div class="hint">그 순간을 채점합니다. 망설여지면 처음 떠오른 숫자로. 나의 과거와만 비교합니다.</div>
+    </div>
+
+    <div class="field" id="f-types">
+      <label>유형 <span class="opt">· 선택</span></label>
+      <div class="chips" id="c-types"></div>
+    </div>
+
+    <div class="field">
+      <label id="l-aspect">양상 <span class="opt">· 선택</span></label>
+      <div class="chips" id="c-aspect"></div>
+    </div>
+
+    <div class="field">
+      <label>원인 · 맥락 <span class="opt">· 선택</span></label>
+      <div class="chips" id="c-cause"></div>
+    </div>
+
+    <div class="field" id="f-react">
+      <label>내 반응 — 그 순간 실제로 한 행동 <span class="opt">· 선택</span></label>
+      <div class="chips" id="c-react"></div>
+    </div>
+
+    <div class="field" id="f-keep">
+      <label>이 순간을 어떻게 남겼나 <span class="opt">· 선택</span></label>
+      <div class="chips" id="c-keep"></div>
+    </div>
+
+    <div class="field">
+      <label>지금 기분 <span class="opt">· 사건과 별개, 현재 상태</span></label>
+      <div class="chips" id="c-mood"></div>
+    </div>
+
+    <div class="field">
+      <label>한 줄 메모 <span class="opt">· 선택</span></label>
+      <textarea id="memo" rows="2" placeholder="필요하면 한 줄만"></textarea>
+    </div>
+
+    <div class="field">
+      <label>시점</label>
+      <div class="seg" id="seg-when">
+        <button class="on" data-v="now" onclick="setWhen('now')">지금 일어난 일</button>
+        <button data-v="back" onclick="setWhen('back')">아까 · 사후기록</button>
+      </div>
+      <div class="hint" id="backhint"></div>
+    </div>
+
+    <div class="savebar">
+      <button class="btn save" onclick="saveEvent()">기록 완료</button>
+      <button class="btn ghost" onclick="saveEvent(true)">강도만 찍고 나중에 채우기</button>
+    </div>
+  </div>
+</section>
+
+<!-- REPORT -->
+<section id="report">
+  <div class="wrap" id="reportbody"></div>
+</section>
+
+<!-- DATA -->
+<section id="data">
+  <div class="wrap">
+    <h2 class="rt">내보내기</h2>
+    <div class="dbtn">
+      <button onclick="exportJSON()">JSON 내보내기</button>
+      <button onclick="exportCSV()">CSV 내보내기</button>
+    </div>
+    <div class="hint">데이터는 이 기기 브라우저에만 저장됩니다(로컬 우선). 정기적으로 내보내 백업하세요. 나중에 진짜 앱으로 이관할 때 이 JSON을 씁니다.</div>
+
+    <h2 class="rt">최근 기록 <span class="opt" style="font-weight:400;color:var(--faint)">· 탭하면 수정</span></h2>
+    <div class="rowlist" id="recentlist"></div>
+
+    <h2 class="rt">관리</h2>
+    <div class="dbtn">
+      <button class="danger" onclick="wipe()">전체 삭제</button>
+    </div>
+  </div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<nav>
+  <div class="inner">
+    <button id="nav-home" class="on" onclick="go('home')"><span class="ni">🖊</span>기록</button>
+    <button id="nav-report" onclick="go('report')"><span class="ni">📊</span>리포트</button>
+    <button id="nav-data" onclick="go('data')"><span class="ni">🗄</span>데이터</button>
+  </div>
+</nav>
+
+<script>
+/* ---------- schema / tag sets (P0 키트와 동일) ---------- */
+const ANCHORS = {
+  고통:[[2,'신호','알아차렸지만 금방 잊었다'],[4,'소음','신경 쓰이지만 하던 일은 계속했다'],
+        [6,'간섭','집중이 깨졌다. 일을 이어가기 어려웠다'],[8,'장악','이것 말고 다른 생각을 하기 어려웠다 / 계획을 바꿨다'],
+        [10,'정지','지금 당장 조치가 필요했다 / 아무것도 할 수 없었다']],
+  기쁨:[[2,'스침','잠깐 좋았고, 곧 지나갔다'],[4,'미소','혼자 있는데도 표정이 풀렸다'],
+        [6,'전파','누군가에게 말하고 싶어졌다'],[8,'보존','이 순간을 남기고 싶어졌다 (사진, 메모) / 머물고 싶었다'],
+        [10,'각인','오늘이 오래 기억에 남을 것이다']]
+};
+const TAGS = {
+  고통:{
+    aspect:['압박감','답답함','불안','짜증','무기력','자책','두통','소화불량','피로·수면부족'],
+    cause:['학원 수업·교재','과외·코칭','FLINT 개발','밴드·EP·공연','대인관계','돈','건강','미래 불확실','일정 과부하'],
+    react:['회피(딴짓·스크롤)','그냥 방치','폭식·야식','카페인','산책·운동','음악','누군가에게 말함','일에 더 몰입','잠']
+  },
+  기쁨:{
+    aspect:['몰입','설렘','안도','뿌듯함','유대감','웃김','평온','해방감'],
+    cause:['학원 수업·학생','과외·코칭','FLINT 개발','밴드·음악','대인관계','음식','콘텐츠(음악·영상·책)','날씨·산책','혼자만의 시간'],
+    keep:['사진·영상','메모','누군가에게 공유','남기지 않음']
+  }
+};
+const MOODS=['😣','😕','😐','🙂','😌'];
+const DOW=['일','월','화','수','목','금','토'];
+const BUCKETS=['새벽','오전','오후','밤'];
+const KEY='kyeol_events_v1';
+
+/* ---------- storage ---------- */
+function load(){ try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return []} }
+function save(a){ localStorage.setItem(KEY,JSON.stringify(a)) }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7) }
+function bucket(h){ return h<6?'새벽':h<12?'오전':h<18?'오후':'밤' }
+
+/* ---------- record state ---------- */
+let R=null; // current draft
+function startRecord(pol){
+  R={id:uid(),polarity:pol,intensity:5,types:[],aspects:[],causes:[],reactions:[],keep:[],mood:null,memo:'',backfilled:false,source:'app'};
+  buildForm();
+  go('record');
+}
+function editRecord(id){
+  const e=load().find(x=>x.id===id); if(!e)return;
+  R=JSON.parse(JSON.stringify(e)); R._edit=true;
+  buildForm(); go('record');
+}
+function buildForm(){
+  const pol=R.polarity, isPain=pol==='고통';
+  const rh=document.getElementById('rhead');
+  rh.className='rhead '+(isPain?'pain':'joy');
+  document.getElementById('rbadge').textContent=pol;
+  document.getElementById('rsubtitle').textContent=R._edit?'수정 중':'';
+  document.getElementById('record').className='active '+(isPain?'pain':'joy');
+  // slider
+  document.getElementById('intslider').value=R.intensity;
+  onSlide();
+  // types (pain only)
+  document.getElementById('f-types').style.display=isPain?'':'none';
+  chipset('c-types', isPain?['신체적','심리적']:[], R.types);
+  // aspect label
+  document.getElementById('l-aspect').innerHTML='양상 <span class="opt">· 선택</span>';
+  chipset('c-aspect', TAGS[pol].aspect, R.aspects);
+  chipset('c-cause', TAGS[pol].cause, R.causes);
+  // reaction (pain) / keep (joy)
+  document.getElementById('f-react').style.display=isPain?'':'none';
+  document.getElementById('f-keep').style.display=isPain?'none':'';
+  chipset('c-react', isPain?TAGS.고통.react:[], R.reactions);
+  chipset('c-keep', isPain?[]:TAGS.기쁨.keep, R.keep);
+  // mood
+  const mc=document.getElementById('c-mood'); mc.innerHTML='';
+  MOODS.forEach((m,i)=>{
+    const b=document.createElement('div'); b.className='chip mood'+(R.mood===i+1?' on':''); b.textContent=m;
+    b.onclick=()=>{R.mood=(R.mood===i+1?null:i+1); buildForm()};
+    mc.appendChild(b);
+  });
+  document.getElementById('memo').value=R.memo||'';
+  // when
+  document.querySelectorAll('#seg-when button').forEach(b=>b.classList.toggle('on', (b.dataset.v==='back')===R.backfilled));
+  setWhenHint();
+}
+function chipset(id,list,sel){
+  const el=document.getElementById(id); el.innerHTML='';
+  list.forEach(t=>{
+    const b=document.createElement('div');
+    b.className='chip'+(sel.includes(t)?' on':''); b.textContent=t;
+    b.onclick=()=>{ const i=sel.indexOf(t); i>=0?sel.splice(i,1):sel.push(t); b.classList.toggle('on'); };
+    el.appendChild(b);
+  });
+}
+function onSlide(){
+  const v=+document.getElementById('intslider').value; R.intensity=v;
+  const set=ANCHORS[R.polarity]; let a=set[0];
+  for(const z of set){ if(v<=z[0]){a=z;break} }
+  document.getElementById('intnum').textContent=v;
+  document.getElementById('intzone').textContent=a[1];
+  document.getElementById('intphrase').textContent=a[2];
+}
+function setWhen(v){ R.backfilled=(v==='back'); buildForm(); }
+function setWhenHint(){
+  const h=document.getElementById('backhint');
+  if(!R.backfilled){h.textContent='';return}
+  h.textContent=R.polarity==='기쁨'
+    ? '오늘 지나간 순간을 회수합니다. 사후기록으로 표시됩니다(당일 한정).'
+    : '고통 사후기록은 회상이 왜곡되기 쉽습니다. 표시만 남기고 유도하지 않습니다.';
+}
+function saveEvent(quick){
+  const now=new Date();
+  R.memo=document.getElementById('memo').value.trim();
+  R.ts = R.ts || now.toISOString();
+  R.dow = R.dow || DOW[now.getDay()];
+  R.timeBucket = R.timeBucket || bucket(now.getHours());
+  const arr=load();
+  const i=arr.findIndex(x=>x.id===R.id);
+  if(i>=0) arr[i]=R; else arr.push(R);
+  save(arr);
+  toast(R._edit?'수정됨':(quick?'저장 — 나중에 채우세요':'기록됐습니다'));
+  R=null;
+  go('home');
+}
+
+/* ---------- nav ---------- */
+function go(id){
+  document.querySelectorAll('section').forEach(s=>s.classList.toggle('active',s.id===id));
+  ['home','report','data'].forEach(n=>{
+    const b=document.getElementById('nav-'+n); if(b) b.classList.toggle('on',n===id);
+  });
+  if(id==='home') renderHome();
+  if(id==='report') renderReport();
+  if(id==='data') renderData();
+  window.scrollTo(0,0);
+}
+function toast(t){ const el=document.getElementById('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),1800); }
+
+/* ---------- home ---------- */
+function renderHome(){
+  const arr=load(); const t=new Date().toDateString();
+  const n=arr.filter(e=>new Date(e.ts).toDateString()===t).length;
+  document.getElementById('todayline').innerHTML = n? `오늘 <b>${n}건</b> 기록` : '';
+}
+
+/* ---------- report ---------- */
+function within(arr,days){ const c=Date.now()-days*864e5; return arr.filter(e=>new Date(e.ts).getTime()>=c) }
+function tally(items){ const m={}; items.forEach(t=>m[t]=(m[t]||0)+1); return Object.entries(m).sort((a,b)=>b[1]-a[1]) }
+function renderReport(){
+  const arr=load(); const b=document.getElementById('reportbody');
+  if(arr.length<3){ b.innerHTML=`<div class="empty" style="padding:60px 20px">기록이 <b>3건</b> 이상 쌓이면<br>여기 패턴이 나타납니다.<br><br><span style="color:var(--faint)">지금 ${arr.length}건</span></div>`; return }
+  const pain=arr.filter(e=>e.polarity==='고통'), joy=arr.filter(e=>e.polarity==='기쁨');
+  const wk=within(arr,7).length;
+  const joyPct=Math.round(joy.length/arr.length*100);
+  // trigger ranking (pain causes)
+  const trig=tally(pain.flatMap(e=>e.causes||[])).slice(0,6);
+  const trigMax=trig.length?trig[0][1]:1;
+  // reaction profile intensity>=7
+  const hi=pain.filter(e=>e.intensity>=7);
+  const react=tally(hi.flatMap(e=>e.reactions||[])).slice(0,5);
+  const reactTot=hi.length;
+  // heatmap
+  const heat={}; arr.forEach(e=>{const k=e.dow+'|'+e.timeBucket; heat[k]=(heat[k]||0)+1});
+  const heatMax=Math.max(1,...Object.values(heat));
+  // recovery (locked < 5 joy)
+  const recovery=recoveryBlock(arr,joy);
+
+  let h='';
+  // weekly
+  h+=`<h2 class="rt">기록 가설</h2><div class="card">
+    <div class="stat"><span class="big">${wk}</span><span class="unit">건 / 최근 7일</span>
+      <span class="goal">목표 ≥5 ${wk>=5?'<span class="pill ok">달성</span>':'<span class="pill no">미달</span>'}</span></div></div>`;
+  // polarity
+  h+=`<h2 class="rt">고통 · 기쁨 비중</h2><div class="card">
+    <div class="stat"><span class="big" style="color:var(--pain-ink)">${pain.length}</span><span class="unit">고통</span>
+      <span style="color:var(--faint)">·</span>
+      <span class="big" style="color:var(--joy-ink)">${joy.length}</span><span class="unit">기쁨</span>
+      <span class="goal">기쁨 ${joyPct}% ${joyPct>=25?'<span class="pill ok">≥25%</span>':'<span class="pill no">&lt;25%</span>'}</span></div>
+    <div class="split"><div class="seg2" style="flex:${pain.length||1};background:var(--pain)"></div><div class="seg2" style="flex:${joy.length||1};background:var(--joy)"></div></div>
+    </div>`;
+  // trigger
+  h+=`<h2 class="rt">트리거 랭킹 <span class="opt" style="font-weight:400;color:var(--faint)">· 고통 원인</span></h2><div class="card">`;
+  h+= trig.length? trig.map(([n,c])=>bar(n,c,trigMax,'pain')).join('') : `<div class="empty">원인 태그가 아직 없습니다</div>`;
+  h+=`</div>`;
+  // reaction profile
+  h+=`<h2 class="rt">반응 프로파일 <span class="opt" style="font-weight:400;color:var(--faint)">· 강도 7↑</span></h2><div class="card">`;
+  if(reactTot>=3 && react.length){
+    h+=`<div class="muted-s" style="margin-bottom:10px">강도 7 이상 ${reactTot}건에서 —</div>`;
+    h+=react.map(([n,c])=>bar(n+` · ${Math.round(c/reactTot*100)}%`,c,reactTot,'pain')).join('');
+  } else h+=`<div class="empty">강도 7 이상 기록이 3건 모이면 열립니다 <span style="color:var(--faint)">(지금 ${reactTot}건)</span></div>`;
+  h+=`</div>`;
+  // recovery
+  h+=`<h2 class="rt">회복 효과 분석</h2>`+recovery;
+  // heatmap
+  h+=`<h2 class="rt">시간 히트맵 <span class="opt" style="font-weight:400;color:var(--faint)">· 요일 × 시간대</span></h2><div class="card"><div class="heat">`;
+  h+=`<div></div>`+BUCKETS.map(x=>`<div class="hh">${x}</div>`).join('');
+  DOW.forEach(d=>{ h+=`<div class="rl">${d}</div>`+BUCKETS.map(bk=>{
+    const c=heat[d+'|'+bk]||0; const a=c?(.16+.84*c/heatMax):0;
+    const bg=c?`color-mix(in srgb, var(--pain) ${Math.round(a*100)}%, var(--surface-2))`:'var(--surface-2)';
+    return `<div class="cell" style="background:${bg};color:${a>.5?'#fff':'var(--muted)'}">${c||''}</div>`;
+  }).join(''); });
+  h+=`</div></div>`;
+  // guard note
+  h+=`<div class="whisper" style="margin-top:20px">이 리포트는 <b>나의 과거와만</b> 비교합니다. 남과 비교하지 않습니다. 진단·치료 목적이 아닙니다.</div>`;
+  b.innerHTML=h;
+}
+function bar(nm,c,max,cls){
+  return `<div class="barrow ${cls}"><span class="nm">${nm}</span><span class="track"><span class="fill" style="width:${Math.round(c/max*100)}%"></span></span><span class="vv">${c}</span></div>`;
+}
+function recoveryBlock(arr,joy){
+  if(joy.length<5){
+    const p=Math.round(joy.length/5*100);
+    return `<div class="card"><div class="locked"><div class="lk">🔒</div>
+      <div style="margin-top:6px"><b>기쁨 기록 5건</b>이 모이면 회복 분석이 열립니다</div>
+      <div class="muted-s">기쁨 데이터 없이는 계산 자체가 불가능합니다</div>
+      <div class="prog"><div class="fill" style="width:${p}%"></div></div>
+      <div class="muted-s" style="margin-top:6px">${joy.length} / 5</div></div></div>`;
+  }
+  // joy → 다음 고통까지 24h 내 고통 평균강도 vs 전체 고통 평균
+  const evs=arr.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  const pain=arr.filter(e=>e.polarity==='고통');
+  const painAvg=pain.length?pain.reduce((s,e)=>s+e.intensity,0)/pain.length:0;
+  let after=[];
+  evs.forEach((e,i)=>{
+    if(e.polarity!=='기쁨')return;
+    const t0=new Date(e.ts).getTime();
+    for(let j=i+1;j<evs.length;j++){
+      const nx=evs[j]; const dt=(new Date(nx.ts).getTime()-t0)/36e5;
+      if(dt>24)break;
+      if(nx.polarity==='고통'){ after.push(nx.intensity); break; }
+    }
+  });
+  if(!after.length) return `<div class="card"><div class="muted-s">기쁨 이후 24시간 내 고통 기록이 아직 없습니다. 데이터가 더 쌓이면 비교가 나타납니다.</div></div>`;
+  const afterAvg=after.reduce((a,b)=>a+b,0)/after.length;
+  const diff=(painAvg-afterAvg);
+  const better=diff>0.3;
+  return `<div class="card">
+    <div class="stat"><span class="big" style="color:var(--joy-ink)">${afterAvg.toFixed(1)}</span><span class="unit">기쁨 직후 24h 고통 평균강도</span></div>
+    <div class="muted-s" style="margin-top:6px">전체 고통 평균 ${painAvg.toFixed(1)} · ${after.length}건 비교
+      ${better?'<span class="pill ok">직후가 더 낮음</span>':(diff<-0.3?'<span class="pill no">직후가 더 높음</span>':'<span class="pill">차이 미미</span>')}</div>
+    <div class="muted-s" style="margin-top:8px;color:var(--faint)">표본이 작으면 흔들립니다. 경향으로만 보세요.</div></div>`;
+}
+
+/* ---------- data ---------- */
+function renderData(){
+  const arr=load().slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const el=document.getElementById('recentlist');
+  if(!arr.length){ el.innerHTML='<div class="empty">아직 기록이 없습니다</div>'; return }
+  el.innerHTML=arr.slice(0,40).map(e=>{
+    const d=new Date(e.ts); const isPain=e.polarity==='고통';
+    const tags=[...(e.causes||[]),...(e.aspects||[])].slice(0,3).join(' · ');
+    const dt=`${d.getMonth()+1}/${d.getDate()} ${e.dow} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    return `<div class="rec ${isPain?'pain':'joy'}" onclick="editRecord('${e.id}')">
+      <span class="ic">${e.intensity}</span>
+      <span class="meta"><span class="t1">${e.polarity}${e.memo?' — '+esc(e.memo):(tags?' · '+tags:'')}</span>
+        <span class="t2">${dt}${e.backfilled?' · 사후':''}</span></span>
+      <span class="flag">›</span></div>`;
+  }).join('');
+}
+function esc(s){ return (s+'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])) }
+
+function download(name,text,type){
+  const blob=new Blob([text],{type}); const u=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u);
+}
+function exportJSON(){ download(`kyeol_${today()}.json`, JSON.stringify(load(),null,2),'application/json'); toast('JSON 저장'); }
+function exportCSV(){
+  const arr=load(); const cols=['ts','dow','timeBucket','polarity','intensity','types','aspects','causes','reactions','keep','mood','memo','backfilled','source'];
+  const esc2=v=>{ if(Array.isArray(v))v=v.join(';'); v=(v==null?'':v)+''; return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const rows=[cols.join(',')].concat(arr.map(e=>cols.map(c=>esc2(e[c])).join(',')));
+  download(`kyeol_${today()}.csv`, '﻿'+rows.join('\n'),'text/csv'); toast('CSV 저장');
+}
+function today(){ const d=new Date(); return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}` }
+function wipe(){
+  if(!confirm('모든 기록을 삭제합니다. 되돌릴 수 없습니다. 내보내기 백업을 먼저 하세요.\n\n삭제할까요?'))return;
+  if(!confirm('정말 전체 삭제할까요? 마지막 확인입니다.'))return;
+  localStorage.removeItem(KEY); toast('전체 삭제됨'); renderData(); renderHome();
+}
+
+/* ---------- boot ---------- */
+if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+renderHome();
+</script>
+</body>
+</html>
