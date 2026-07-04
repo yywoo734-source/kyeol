@@ -165,6 +165,8 @@
   .rec .t1{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .rec .t2{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .rec .flag{font-size:10px;color:var(--faint)}
+  .recdel{flex:none;border:none;background:var(--surface-2);color:var(--muted);width:30px;height:30px;border-radius:50%;font-size:13px;cursor:pointer;line-height:1}
+  .recdel:active{transform:scale(.9);color:var(--pain-ink)}
   .dbtn{display:flex;gap:10px;margin:8px 0 4px}
   .dbtn button{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:12px;padding:12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
   .danger{color:var(--pain-ink);border-color:color-mix(in srgb,var(--pain) 30%,var(--line))!important}
@@ -286,6 +288,9 @@
 <!-- DATA -->
 <section id="data">
   <div class="wrap">
+    <h2 class="rt">동기화 · 백업</h2>
+    <div class="card" id="cloudbox"></div>
+
     <h2 class="rt">내보내기</h2>
     <div class="dbtn">
       <button onclick="exportJSON()">JSON 내보내기</button>
@@ -340,11 +345,19 @@ const DOW=['일','월','화','수','목','금','토'];
 const BUCKETS=['새벽','오전','오후','밤'];
 const KEY='kyeol_events_v1';
 
+/* ---------- cloud config (프로젝트 생성 후 채움) ---------- */
+const SUPABASE_URL='';        // 예: https://xxxx.supabase.co
+const SUPABASE_ANON_KEY='';   // anon public key (공개용, RLS가 보호)
+const CLOUD_ENABLED = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+let sb=null, session=null, syncing=false, cur_view='home';
+
 /* ---------- storage ---------- */
-function load(){ try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return []} }
+function load(){ try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return []} }        // raw (tombstone 포함)
+function active(){ return load().filter(e=>!e.deleted) }                                            // 화면·리포트용
 function save(a){ localStorage.setItem(KEY,JSON.stringify(a)) }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7) }
 function bucket(h){ return h<6?'새벽':h<12?'오전':h<18?'오후':'밤' }
+function nowISO(){ return new Date().toISOString() }
 
 /* ---------- record state ---------- */
 let R=null; // current draft
@@ -423,17 +436,21 @@ function saveEvent(quick){
   R.ts = R.ts || now.toISOString();
   R.dow = R.dow || DOW[now.getDay()];
   R.timeBucket = R.timeBucket || bucket(now.getHours());
+  R.updatedAt = now.toISOString();
+  const edited=R._edit; delete R._edit;
   const arr=load();
   const i=arr.findIndex(x=>x.id===R.id);
   if(i>=0) arr[i]=R; else arr.push(R);
   save(arr);
-  toast(R._edit?'수정됨':(quick?'저장 — 나중에 채우세요':'기록됐습니다'));
+  toast(edited?'수정됨':(quick?'저장 — 나중에 채우세요':'기록됐습니다'));
   R=null;
+  scheduleSync();
   go('home');
 }
 
 /* ---------- nav ---------- */
 function go(id){
+  cur_view=id;
   document.querySelectorAll('section').forEach(s=>s.classList.toggle('active',s.id===id));
   ['home','report','data'].forEach(n=>{
     const b=document.getElementById('nav-'+n); if(b) b.classList.toggle('on',n===id);
@@ -447,7 +464,7 @@ function toast(t){ const el=document.getElementById('toast'); el.textContent=t; 
 
 /* ---------- home ---------- */
 function renderHome(){
-  const arr=load(); const t=new Date().toDateString();
+  const arr=active(); const t=new Date().toDateString();
   const n=arr.filter(e=>new Date(e.ts).toDateString()===t).length;
   document.getElementById('todayline').innerHTML = n? `오늘 <b>${n}건</b> 기록` : '';
 }
@@ -456,7 +473,7 @@ function renderHome(){
 function within(arr,days){ const c=Date.now()-days*864e5; return arr.filter(e=>new Date(e.ts).getTime()>=c) }
 function tally(items){ const m={}; items.forEach(t=>m[t]=(m[t]||0)+1); return Object.entries(m).sort((a,b)=>b[1]-a[1]) }
 function renderReport(){
-  const arr=load(); const b=document.getElementById('reportbody');
+  const arr=active(); const b=document.getElementById('reportbody');
   if(arr.length<3){ b.innerHTML=`<div class="empty" style="padding:60px 20px">기록이 <b>3건</b> 이상 쌓이면<br>여기 패턴이 나타납니다.<br><br><span style="color:var(--faint)">지금 ${arr.length}건</span></div>`; return }
   const pain=arr.filter(e=>e.polarity==='고통'), joy=arr.filter(e=>e.polarity==='기쁨');
   const wk=within(arr,7).length;
@@ -552,7 +569,7 @@ function recoveryBlock(arr,joy){
 
 /* ---------- data ---------- */
 function renderData(){
-  const arr=load().slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const arr=active().slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
   const el=document.getElementById('recentlist');
   if(!arr.length){ el.innerHTML='<div class="empty">아직 기록이 없습니다</div>'; return }
   el.innerHTML=arr.slice(0,40).map(e=>{
@@ -563,7 +580,7 @@ function renderData(){
       <span class="ic">${e.intensity}</span>
       <span class="meta"><span class="t1">${e.polarity}${e.memo?' — '+esc(e.memo):(tags?' · '+tags:'')}</span>
         <span class="t2">${dt}${e.backfilled?' · 사후':''}</span></span>
-      <span class="flag">›</span></div>`;
+      <button class="recdel" onclick="event.stopPropagation();delOne('${e.id}')" aria-label="삭제">✕</button></div>`;
   }).join('');
 }
 function esc(s){ return (s+'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])) }
@@ -572,9 +589,9 @@ function download(name,text,type){
   const blob=new Blob([text],{type}); const u=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u);
 }
-function exportJSON(){ download(`kyeol_${today()}.json`, JSON.stringify(load(),null,2),'application/json'); toast('JSON 저장'); }
+function exportJSON(){ download(`kyeol_${today()}.json`, JSON.stringify(active(),null,2),'application/json'); toast('JSON 저장'); }
 function exportCSV(){
-  const arr=load(); const cols=['ts','dow','timeBucket','polarity','intensity','types','aspects','causes','reactions','keep','mood','memo','backfilled','source'];
+  const arr=active(); const cols=['ts','dow','timeBucket','polarity','intensity','types','aspects','causes','reactions','keep','mood','memo','backfilled','source'];
   const esc2=v=>{ if(Array.isArray(v))v=v.join(';'); v=(v==null?'':v)+''; return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   const rows=[cols.join(',')].concat(arr.map(e=>cols.map(c=>esc2(e[c])).join(',')));
   download(`kyeol_${today()}.csv`, '﻿'+rows.join('\n'),'text/csv'); toast('CSV 저장');
@@ -583,12 +600,110 @@ function today(){ const d=new Date(); return `${d.getFullYear()}${String(d.getMo
 function wipe(){
   if(!confirm('모든 기록을 삭제합니다. 되돌릴 수 없습니다. 내보내기 백업을 먼저 하세요.\n\n삭제할까요?'))return;
   if(!confirm('정말 전체 삭제할까요? 마지막 확인입니다.'))return;
-  localStorage.removeItem(KEY); toast('전체 삭제됨'); renderData(); renderHome();
+  if(session){
+    // 로그인 상태: tombstone으로 표시해 클라우드·다른 기기에도 삭제 전파
+    const all=load().map(e=>({...e,deleted:true,updatedAt:nowISO()}));
+    save(all); syncNow();
+  } else {
+    localStorage.removeItem(KEY);
+  }
+  toast('전체 삭제됨'); renderData(); renderHome();
+}
+function delOne(id){
+  if(!confirm('이 기록을 삭제할까요?'))return;
+  const all=load(); const i=all.findIndex(e=>e.id===id);
+  if(i<0)return;
+  if(session){ all[i]={...all[i],deleted:true,updatedAt:nowISO()}; }
+  else { all.splice(i,1); }
+  save(all); scheduleSync(); toast('삭제됨'); renderData(); renderHome();
+}
+
+/* ---------- cloud sync (Supabase) ---------- */
+let _syncTimer=null;
+function scheduleSync(){ if(!session)return; clearTimeout(_syncTimer); _syncTimer=setTimeout(syncNow,1200); }
+
+async function initCloud(){
+  if(!CLOUD_ENABLED) { renderCloud(); return; }
+  try{
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY,
+      { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true } });
+    const { data:{ session:s } } = await sb.auth.getSession();
+    session = s;
+    sb.auth.onAuthStateChange((_e,s2)=>{ session=s2; renderCloud(); if(s2) syncNow(); });
+    if(session) syncNow();
+  }catch(err){ console.warn('cloud init 실패', err); }
+  renderCloud();
+}
+
+async function syncNow(){
+  if(!sb || !session || syncing || !navigator.onLine) return;
+  syncing=true; renderCloud('동기화 중…');
+  try{
+    const uid=session.user.id;
+    const localAll=load();
+    if(localAll.length){
+      const rows=localAll.map(e=>({ id:e.id, user_id:uid, data:e, updated_at:e.updatedAt||e.ts, deleted:!!e.deleted }));
+      const { error } = await sb.from('events').upsert(rows);
+      if(error) throw error;
+    }
+    const { data:remote, error:e2 } = await sb.from('events').select('id,data,updated_at,deleted');
+    if(e2) throw e2;
+    const byId={}; localAll.forEach(e=>byId[e.id]=e);
+    let changed=false;
+    (remote||[]).forEach(r=>{
+      const rec={ ...(r.data||{}), id:r.id, updatedAt:r.updated_at, deleted:r.deleted };
+      const cur=byId[r.id];
+      if(!cur || new Date(r.updated_at) > new Date(cur.updatedAt||cur.ts)){ byId[r.id]=rec; changed=true; }
+    });
+    save(Object.values(byId));
+    localStorage.setItem('kyeol_last_sync', nowISO());
+    renderCloud();
+    if(changed){ renderHome(); if(cur_view==='report')renderReport(); if(cur_view==='data')renderData(); }
+  }catch(err){ renderCloud('동기화 실패 — '+(err.message||err)); }
+  finally{ syncing=false; }
+}
+
+async function cloudSignIn(){
+  if(!sb) return;
+  const email=prompt('이메일 주소 — 로그인 링크를 보냅니다');
+  if(!email) return;
+  const { error } = await sb.auth.signInWithOtp({ email:email.trim(), options:{ emailRedirectTo: location.href.split('#')[0] } });
+  toast(error ? ('오류: '+error.message) : '메일함 확인 → 링크 클릭');
+}
+async function cloudSignOut(){ if(sb){ await sb.auth.signOut(); toast('로그아웃 — 로컬 데이터는 이 기기에 남음'); renderCloud(); } }
+
+function renderCloud(msg){
+  const el=document.getElementById('cloudbox'); if(!el) return;
+  if(!CLOUD_ENABLED){
+    el.innerHTML=`<div class="muted-s">클라우드 동기화 <b style="color:var(--text)">미설정</b>. 지금은 이 기기에만 저장됩니다. 내보내기로 백업하세요.</div>`;
+    return;
+  }
+  if(!session){
+    el.innerHTML=`<div class="stat" style="margin-bottom:10px"><span style="font-weight:700">클라우드 동기화</span>
+      <span class="goal"><span class="pill no">로그아웃</span></span></div>
+      <div class="muted-s" style="margin-bottom:12px">로그인하면 기록이 클라우드에 백업되고 다른 기기와 동기화됩니다. 캐시 삭제·폰 교체에도 안전.</div>
+      <button class="btn" style="background:var(--joy);color:#fff" onclick="cloudSignIn()">이메일로 로그인</button>`;
+    return;
+  }
+  const last=localStorage.getItem('kyeol_last_sync');
+  const lt=last? new Date(last) : null;
+  const lts=lt? `${lt.getMonth()+1}/${lt.getDate()} ${String(lt.getHours()).padStart(2,'0')}:${String(lt.getMinutes()).padStart(2,'0')}` : '아직 없음';
+  el.innerHTML=`<div class="stat" style="margin-bottom:8px"><span style="font-weight:700">클라우드 동기화</span>
+    <span class="goal"><span class="pill ok">${msg?'…':'켜짐'}</span></span></div>
+    <div class="muted-s">${esc(session.user.email||'로그인됨')}</div>
+    <div class="muted-s" style="margin-top:2px">${msg?esc(msg):('마지막 동기화 '+lts)}</div>
+    <div class="dbtn" style="margin-top:12px">
+      <button onclick="syncNow()">지금 동기화</button>
+      <button onclick="cloudSignOut()">로그아웃</button>
+    </div>`;
 }
 
 /* ---------- boot ---------- */
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+window.addEventListener('online', ()=>{ if(session) syncNow(); });
 renderHome();
+initCloud();
 </script>
 </body>
 </html>
