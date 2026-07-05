@@ -102,6 +102,9 @@
   .joy  .chip.on{background:var(--joy);color:#fff}
   .chip.mood{font-size:22px;padding:8px 12px;line-height:1}
   .chip.mood.on{background:var(--surface-2);border-color:currentColor}
+  .chip .cnt{font-size:11px;opacity:.55;font-weight:700;margin-left:1px}
+  .chip.on .cnt{opacity:.85}
+  .addchip{border-style:dashed;color:var(--muted);font-weight:600}
 
   textarea{width:100%;border:1px solid var(--line);background:var(--surface);color:var(--text);
     border-radius:14px;padding:12px 14px;font:inherit;resize:none;min-height:52px}
@@ -308,12 +311,25 @@
   </div>
 </section>
 
+<!-- CONNECT -->
+<section id="connect">
+  <div class="wrap">
+    <div class="seg" id="gfilter" style="margin-top:18px">
+      <button class="on" data-f="all" onclick="setGraphFilter('all')">전체</button>
+      <button data-f="고통" onclick="setGraphFilter('고통')">고통</button>
+      <button data-f="기쁨" onclick="setGraphFilter('기쁨')">기쁨</button>
+    </div>
+    <div id="connectbody"></div>
+  </div>
+</section>
+
 <div class="toast" id="toast"></div>
 
 <nav>
   <div class="inner">
     <button id="nav-home" class="on" onclick="go('home')"><span class="ni">🖊</span>기록</button>
     <button id="nav-report" onclick="go('report')"><span class="ni">📊</span>리포트</button>
+    <button id="nav-connect" onclick="go('connect')"><span class="ni">🕸</span>연결</button>
     <button id="nav-data" onclick="go('data')"><span class="ni">🗄</span>데이터</button>
   </div>
 </nav>
@@ -328,18 +344,21 @@ const ANCHORS = {
         [6,'전파','누군가에게 말하고 싶어졌다'],[8,'보존','이 순간을 남기고 싶어졌다 (사진, 메모) / 머물고 싶었다'],
         [10,'각인','오늘이 오래 기억에 남을 것이다']]
 };
+// 프리셋은 최소 코어만. 나머지는 "＋추가"로 직접, 쓰던 태그는 빈도순으로 자동 상단 노출.
 const TAGS = {
   고통:{
-    aspect:['압박감','답답함','불안','짜증','무기력','자책','두통','소화불량','피로·수면부족'],
-    cause:['학원 수업·교재','과외·코칭','FLINT 개발','밴드·EP·공연','대인관계','돈','건강','미래 불확실','일정 과부하'],
-    react:['회피(딴짓·스크롤)','그냥 방치','폭식·야식','카페인','산책·운동','음악','누군가에게 말함','일에 더 몰입','잠']
+    aspect:['압박감','불안','무기력','두통','피로·수면부족'],
+    cause:['학원 수업·교재','과외·코칭','FLINT 개발','밴드·EP·공연','대인관계'],
+    react:['회피(딴짓·스크롤)','방치','산책·운동','음악','몰입']
   },
   기쁨:{
-    aspect:['몰입','설렘','안도','뿌듯함','유대감','웃김','평온','해방감'],
-    cause:['학원 수업·학생','과외·코칭','FLINT 개발','밴드·음악','대인관계','음식','콘텐츠(음악·영상·책)','날씨·산책','혼자만의 시간'],
-    keep:['사진·영상','메모','누군가에게 공유','남기지 않음']
+    aspect:['몰입','설렘','안도','뿌듯함','평온'],
+    cause:['학원 수업·학생','과외·코칭','FLINT 개발','밴드·음악','혼자만의 시간'],
+    keep:['사진·영상','메모','공유','남기지 않음']
   }
 };
+const CKEY='kyeol_customtags';                 // 사용자 커스텀 태그 저장
+const FIELD_ARR={aspect:'aspects',cause:'causes',react:'reactions',keep:'keep'};
 const MOODS=['😣','😕','😐','🙂','😌'];
 const DOW=['일','월','화','수','목','금','토'];
 const BUCKETS=['새벽','오전','오후','밤'];
@@ -383,16 +402,15 @@ function buildForm(){
   onSlide();
   // types (pain only)
   document.getElementById('f-types').style.display=isPain?'':'none';
-  chipset('c-types', isPain?['신체적','심리적']:[], R.types);
-  // aspect label
+  chipset('c-types', 'types', R.types);
   document.getElementById('l-aspect').innerHTML='양상 <span class="opt">· 선택</span>';
-  chipset('c-aspect', TAGS[pol].aspect, R.aspects);
-  chipset('c-cause', TAGS[pol].cause, R.causes);
+  chipset('c-aspect', 'aspect', R.aspects);
+  chipset('c-cause', 'cause', R.causes);
   // reaction (pain) / keep (joy)
   document.getElementById('f-react').style.display=isPain?'':'none';
   document.getElementById('f-keep').style.display=isPain?'none':'';
-  chipset('c-react', isPain?TAGS.고통.react:[], R.reactions);
-  chipset('c-keep', isPain?[]:TAGS.기쁨.keep, R.keep);
+  if(isPain) chipset('c-react', 'react', R.reactions);
+  else chipset('c-keep', 'keep', R.keep);
   // mood
   const mc=document.getElementById('c-mood'); mc.innerHTML='';
   MOODS.forEach((m,i)=>{
@@ -405,14 +423,49 @@ function buildForm(){
   document.querySelectorAll('#seg-when button').forEach(b=>b.classList.toggle('on', (b.dataset.v==='back')===R.backfilled));
   setWhenHint();
 }
-function chipset(id,list,sel){
+/* 커스텀 태그 저장 */
+function loadCustom(){ try{return JSON.parse(localStorage.getItem(CKEY))||{}}catch(e){return{}} }
+function getCustom(pol,field){ const c=loadCustom(); return (c[pol]&&c[pol][field])||[]; }
+function addCustom(pol,field,tag){
+  const c=loadCustom(); c[pol]=c[pol]||{}; c[pol][field]=c[pol][field]||[];
+  if(!c[pol][field].includes(tag)){ c[pol][field].push(tag); localStorage.setItem(CKEY,JSON.stringify(c)); }
+}
+/* 이 극성·필드에서 태그별 사용 횟수 */
+function tagCounts(pol,field){
+  const arr=FIELD_ARR[field]; const m={};
+  active().forEach(e=>{ if(e.polarity!==pol)return; (e[arr]||[]).forEach(t=>m[t]=(m[t]||0)+1); });
+  return m;
+}
+/* 표시할 태그 목록: 프리셋+커스텀+사용됨 합집합, 빈도 desc(자주 쓰는 것 상단) */
+function tagPool(field){
+  const pol=R.polarity;
+  const presets=(TAGS[pol]&&TAGS[pol][field])||[];
+  const counts=tagCounts(pol,field);
+  const all=[...new Set([...presets, ...getCustom(pol,field), ...Object.keys(counts)])];
+  const pidx=t=>{ const i=presets.indexOf(t); return i<0?999:i; };
+  all.sort((a,b)=>{ const d=(counts[b]||0)-(counts[a]||0); if(d)return d; const p=pidx(a)-pidx(b); if(p)return p; return a.localeCompare(b); });
+  return {list:all, counts};
+}
+function makeChip(t,sel,count){
+  const b=document.createElement('div');
+  b.className='chip'+(sel.includes(t)?' on':'');
+  b.innerHTML=esc(t)+((count>1)?` <span class="cnt">${count}</span>`:'');
+  b.onclick=()=>{ const i=sel.indexOf(t); i>=0?sel.splice(i,1):sel.push(t); b.classList.toggle('on'); };
+  return b;
+}
+function chipset(id,field,sel){
   const el=document.getElementById(id); el.innerHTML='';
-  list.forEach(t=>{
-    const b=document.createElement('div');
-    b.className='chip'+(sel.includes(t)?' on':''); b.textContent=t;
-    b.onclick=()=>{ const i=sel.indexOf(t); i>=0?sel.splice(i,1):sel.push(t); b.classList.toggle('on'); };
-    el.appendChild(b);
-  });
+  if(field==='types'){ ['신체적','심리적'].forEach(t=>el.appendChild(makeChip(t,sel,0))); return; }
+  const {list,counts}=tagPool(field);
+  list.forEach(t=>el.appendChild(makeChip(t,sel,counts[t]||0)));
+  const add=document.createElement('div');
+  add.className='chip addchip'; add.textContent='＋ 추가';
+  add.onclick=()=>{
+    const t=(prompt('키워드 직접 입력')||'').trim(); if(!t)return;
+    addCustom(R.polarity,field,t); if(!sel.includes(t))sel.push(t);
+    chipset(id,field,sel);
+  };
+  el.appendChild(add);
 }
 function onSlide(){
   const v=+document.getElementById('intslider').value; R.intensity=v;
@@ -452,11 +505,12 @@ function saveEvent(quick){
 function go(id){
   cur_view=id;
   document.querySelectorAll('section').forEach(s=>s.classList.toggle('active',s.id===id));
-  ['home','report','data'].forEach(n=>{
+  ['home','report','connect','data'].forEach(n=>{
     const b=document.getElementById('nav-'+n); if(b) b.classList.toggle('on',n===id);
   });
   if(id==='home') renderHome();
   if(id==='report') renderReport();
+  if(id==='connect') renderConnect();
   if(id==='data') renderData();
   window.scrollTo(0,0);
 }
@@ -567,6 +621,105 @@ function recoveryBlock(arr,joy){
     <div class="muted-s" style="margin-top:8px;color:var(--faint)">표본이 작으면 흔들립니다. 경향으로만 보세요.</div></div>`;
 }
 
+/* ---------- connections (옵시디언식 키워드 연결) ---------- */
+let graphFilter='all', graphSel=null, _g=null, _pos=null, _layoutSig=null;
+function setGraphFilter(f){
+  graphFilter=f; graphSel=null;
+  document.querySelectorAll('#gfilter button').forEach(b=>b.classList.toggle('on', b.dataset.f===f));
+  renderConnect();
+}
+function graphData(filter){
+  const evs=active().filter(e=>filter==='all'||e.polarity===filter);
+  const freq={}, pol={}, co={};
+  evs.forEach(e=>{
+    const tags=[...new Set([...(e.causes||[]),...(e.aspects||[]),...(e.reactions||[]),...(e.keep||[])])].filter(Boolean);
+    tags.forEach(t=>{ freq[t]=(freq[t]||0)+1; (pol[t]=pol[t]||{고통:0,기쁨:0})[e.polarity]++; });
+    for(let i=0;i<tags.length;i++) for(let j=i+1;j<tags.length;j++){
+      const k=[tags[i],tags[j]].sort().join(''); co[k]=(co[k]||0)+1;
+    }
+  });
+  const minNode=evs.length>=20?2:1;
+  const names=Object.keys(freq).filter(t=>freq[t]>=minNode).sort((a,b)=>freq[b]-freq[a]).slice(0,26);
+  const nset=new Set(names), edges=[];
+  for(const k in co){ const p=k.split(''); if(nset.has(p[0])&&nset.has(p[1])) edges.push({a:p[0],b:p[1],w:co[k]}); }
+  return { nodes:names.map(t=>({id:t,freq:freq[t],pol:pol[t]})), edges, total:evs.length };
+}
+function layout(g,W,H){
+  const N=g.nodes.length, pos={};
+  g.nodes.forEach((n,i)=>{ const a=2*Math.PI*i/N; pos[n.id]={x:W/2+Math.cos(a)*W*0.32,y:H/2+Math.sin(a)*H*0.32,vx:0,vy:0}; });
+  const maxW=Math.max(1,...g.edges.map(e=>e.w));
+  for(let it=0;it<240;it++){
+    for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){
+      const A=pos[g.nodes[i].id],B=pos[g.nodes[j].id];
+      let dx=A.x-B.x,dy=A.y-B.y,d2=dx*dx+dy*dy||0.01,d=Math.sqrt(d2),rep=2600/d2;
+      A.vx+=dx/d*rep;A.vy+=dy/d*rep;B.vx-=dx/d*rep;B.vy-=dy/d*rep;
+    }
+    g.edges.forEach(e=>{
+      const A=pos[e.a],B=pos[e.b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.sqrt(dx*dx+dy*dy)||0.01;
+      const f=0.02*(0.5+e.w/maxW)*(d-72);
+      A.vx+=dx/d*f;A.vy+=dy/d*f;B.vx-=dx/d*f;B.vy-=dy/d*f;
+    });
+    g.nodes.forEach(n=>{ const P=pos[n.id];
+      P.vx+=(W/2-P.x)*0.003;P.vy+=(H/2-P.y)*0.003;
+      P.x+=Math.max(-7,Math.min(7,P.vx));P.y+=Math.max(-7,Math.min(7,P.vy));
+      P.vx*=0.86;P.vy*=0.86;
+      P.x=Math.max(26,Math.min(W-26,P.x));P.y=Math.max(30,Math.min(H-34,P.y));
+    });
+  }
+  return pos;
+}
+function nodeColor(n){ const p=n.pol||{고통:0,기쁨:0}; return p.고통>p.기쁨?'var(--pain)':(p.기쁨>p.고통?'var(--joy)':'#9a8f80'); }
+function selNode(i){ const n=_g&&_g.nodes[i]; if(!n)return; graphSel=(graphSel===n.id?null:n.id); renderConnect(); }
+function renderConnect(){
+  const wrap=document.getElementById('connectbody');
+  const g=graphData(graphFilter); _g=g;
+  if(g.nodes.length<2){
+    wrap.innerHTML=`<div class="empty" style="padding:56px 20px">기록이 더 쌓이면<br>키워드들이 <b>맥락으로 이어집니다.</b><br><br><span style="color:var(--faint)">같은 기록에 함께 적은 키워드끼리 연결됩니다</span></div>`;
+    return;
+  }
+  const W=340,H=360;
+  const sig=graphFilter+'|'+g.nodes.map(n=>n.id).join(',')+'|'+g.edges.length;
+  let pos; if(_layoutSig===sig && _pos){ pos=_pos; } else { pos=layout(g,W,H); _pos=pos; _layoutSig=sig; }
+  const idx={}; g.nodes.forEach((n,i)=>idx[n.id]=i);
+  const neigh=new Set(); if(graphSel){ g.edges.forEach(e=>{ if(e.a===graphSel)neigh.add(e.b); if(e.b===graphSel)neigh.add(e.a); }); }
+  const maxW=Math.max(1,...g.edges.map(e=>e.w));
+  // 상단 빈출 키워드 스트립
+  const top=g.nodes.slice().sort((a,b)=>b.freq-a.freq).slice(0,10);
+  let strip=`<div class="muted-s" style="margin:16px 0 8px">자주 나온 키워드 · 탭하면 연결</div><div class="chips">`
+    + top.map(n=>`<div class="chip ${graphSel===n.id?'on':''}" style="${graphSel===n.id?('background:'+nodeColor(n)+';color:#fff;border-color:transparent'):''}" onclick="selNode(${idx[n.id]})">${esc(n.id)} <span class="cnt">${n.freq}</span></div>`).join('')
+    + `</div>`;
+  // 그래프 SVG
+  const edgesSvg=g.edges.map(e=>{
+    const A=pos[e.a],B=pos[e.b];
+    let op=0.12+0.5*(e.w/maxW); if(graphSel) op=(e.a===graphSel||e.b===graphSel)?0.85:0.04;
+    const sw=(graphSel&&(e.a===graphSel||e.b===graphSel))?1.6:(0.6+1.6*e.w/maxW);
+    return `<line x1="${A.x.toFixed(1)}" y1="${A.y.toFixed(1)}" x2="${B.x.toFixed(1)}" y2="${B.y.toFixed(1)}" stroke="var(--faint)" stroke-opacity="${op.toFixed(2)}" stroke-width="${sw.toFixed(1)}"/>`;
+  }).join('');
+  const nodesSvg=g.nodes.map((n,i)=>{
+    const P=pos[n.id], r=6+Math.min(15,n.freq*2.2);
+    let dim=1; if(graphSel && n.id!==graphSel && !neigh.has(n.id)) dim=0.26;
+    const nm=n.id.length>7?n.id.slice(0,6)+'…':n.id, sel=graphSel===n.id;
+    return `<g opacity="${dim}" onclick="selNode(${i})" style="cursor:pointer">`
+      +`<circle cx="${P.x.toFixed(1)}" cy="${P.y.toFixed(1)}" r="${r.toFixed(1)}" fill="${nodeColor(n)}" ${sel?'stroke="var(--text)" stroke-width="2.5"':''}/>`
+      +`<text x="${P.x.toFixed(1)}" y="${(P.y+r+11).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--text)" font-weight="${sel?700:500}">${esc(nm)}</text></g>`;
+  }).join('');
+  const svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;touch-action:manipulation">${edgesSvg}${nodesSvg}</svg>`;
+  // 연결된 키워드(백링크)
+  let linked;
+  if(graphSel){
+    const ns=[]; g.edges.forEach(e=>{ if(e.a===graphSel)ns.push([e.b,e.w]); else if(e.b===graphSel)ns.push([e.a,e.w]); });
+    ns.sort((a,b)=>b[1]-a[1]);
+    const sn=g.nodes[idx[graphSel]], cls=(sn.pol.기쁨>sn.pol.고통)?'joy':'pain';
+    linked=`<div class="card"><div class="stat" style="margin-bottom:8px"><span style="font-weight:700">${esc(graphSel)}</span><span class="goal">${sn.freq}회 기록</span></div>`
+      +(ns.length? `<div class="muted-s" style="margin-bottom:8px">자주 함께 나온 키워드</div>`+ns.map(([t,w])=>bar(esc(t),w,ns[0][1],cls)).join('') : `<div class="empty">아직 함께 나온 키워드가 없습니다</div>`)
+      +`</div>`;
+  } else {
+    linked=`<div class="muted-s" style="text-align:center;margin-top:10px">노드를 탭하면 그 키워드와 <b>함께 나온 것들</b>이 보입니다</div>`;
+  }
+  wrap.innerHTML = strip + `<div class="card" style="padding:6px 6px 2px">${svg}</div>` + linked
+    + `<div class="whisper" style="margin-top:16px">같은 기록에 함께 적은 키워드끼리 이어집니다. 선이 굵을수록 자주 함께 나온 것. 덩어리가 보이면 그게 <b>당신의 반복 패턴</b>입니다.</div>`;
+}
+
 /* ---------- data ---------- */
 function renderData(){
   const arr=active().slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
@@ -659,7 +812,7 @@ async function syncNow(){
     save(Object.values(byId));
     localStorage.setItem('kyeol_last_sync', nowISO());
     renderCloud();
-    if(changed){ renderHome(); if(cur_view==='report')renderReport(); if(cur_view==='data')renderData(); }
+    if(changed){ renderHome(); if(cur_view==='report')renderReport(); if(cur_view==='connect')renderConnect(); if(cur_view==='data')renderData(); }
   }catch(err){ renderCloud('동기화 실패 — '+(err.message||err)); }
   finally{ syncing=false; }
 }
