@@ -346,8 +346,8 @@ const BUCKETS=['새벽','오전','오후','밤'];
 const KEY='kyeol_events_v1';
 
 /* ---------- cloud config (프로젝트 생성 후 채움) ---------- */
-const SUPABASE_URL='';        // 예: https://xxxx.supabase.co
-const SUPABASE_ANON_KEY='';   // anon public key (공개용, RLS가 보호)
+const SUPABASE_URL='https://tgtqrktbqdakgegjrfbl.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRndHFya3RicWRha2dlZ2pyZmJsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwNzM0NjMsImV4cCI6MjA5ODY0OTQ2M30.qszF1i9R1E_WLzWk71y04UhXWUyUDpNmhm2ThIAd94s';
 const CLOUD_ENABLED = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 let sb=null, session=null, syncing=false, cur_view='home';
 
