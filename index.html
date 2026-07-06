@@ -68,6 +68,15 @@
   .whisper{margin-top:30px;padding:16px 18px;border-radius:var(--r);background:var(--surface-2);
     color:var(--muted);font-size:13px;line-height:1.6;border:1px solid var(--line)}
   .whisper b{color:var(--text);font-weight:600}
+  .incline{margin-top:12px;text-align:center;font-size:13px;color:var(--muted);padding:11px;border-radius:12px;background:var(--surface-2);cursor:pointer}
+  .incline b{color:var(--text)}
+  .nudge{margin-top:16px;padding:18px 16px;border-radius:var(--r);background:var(--joy-soft);border:1px solid color-mix(in srgb,var(--joy) 30%,var(--line));cursor:pointer;position:relative}
+  .nudge .nt{font-weight:700;color:var(--joy-ink);font-size:15px}
+  .nudge .ns{color:var(--muted);font-size:12px;margin-top:4px}
+  .nudge .nx{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--faint);font-size:11px;cursor:pointer;padding:6px}
+  .ihint{display:flex;align-items:center;gap:8px;margin-top:6px;padding:10px 12px;border-radius:12px;background:var(--surface-2);color:var(--muted);font-size:12px}
+  .ihint span{flex:1;line-height:1.4}
+  .ihint button{background:none;border:none;color:var(--faint);cursor:pointer;font-size:13px;padding:2px 4px;flex:none}
 
   /* RECORD */
   .rhead{display:flex;align-items:center;gap:10px;margin:18px 0 6px}
@@ -194,6 +203,7 @@
 <!-- HOME -->
 <section id="home" class="active">
   <div class="wrap">
+    <div id="installhint"></div>
     <div class="choose">
       <button class="pain" onclick="startRecord('고통')">
         <span class="em">🌑</span><span class="lb">고통</span>
@@ -205,6 +215,8 @@
       </button>
     </div>
     <div class="todayline" id="todayline"></div>
+    <div id="incompleteline"></div>
+    <div id="eveningnudge"></div>
     <div class="whisper">
       고통은 스스로 기록되기를 요구하지만, <b>스침은 잡아야 남습니다.</b><br>
       1~2점짜리 작은 순간도 기록 대상입니다. 놓친 날은 그냥 비워두세요.
@@ -274,6 +286,15 @@
         <button data-v="back" onclick="setWhen('back')">아까 · 사후기록</button>
       </div>
       <div class="hint" id="backhint"></div>
+      <div id="f-backbucket" style="display:none;margin-top:10px">
+        <div class="hint" style="margin:0 0 8px">언제쯤이었나요? <span class="opt">· 시간 패턴 정확도용</span></div>
+        <div class="seg" id="seg-bucket">
+          <button data-b="새벽" onclick="setBucket('새벽')">새벽</button>
+          <button data-b="오전" onclick="setBucket('오전')">오전</button>
+          <button data-b="오후" onclick="setBucket('오후')">오후</button>
+          <button data-b="밤" onclick="setBucket('밤')">밤</button>
+        </div>
+      </div>
     </div>
 
     <div class="savebar">
@@ -380,8 +401,8 @@ function nowISO(){ return new Date().toISOString() }
 
 /* ---------- record state ---------- */
 let R=null; // current draft
-function startRecord(pol){
-  R={id:uid(),polarity:pol,intensity:5,types:[],aspects:[],causes:[],reactions:[],keep:[],mood:null,memo:'',backfilled:false,source:'app'};
+function startRecord(pol, backfill){
+  R={id:uid(),polarity:pol,intensity:5,types:[],aspects:[],causes:[],reactions:[],keep:[],mood:null,memo:'',backfilled:!!backfill,timeBucketManual:null,source:backfill?'evening_prompt':'app'};
   buildForm();
   go('record');
 }
@@ -421,6 +442,8 @@ function buildForm(){
   document.getElementById('memo').value=R.memo||'';
   // when
   document.querySelectorAll('#seg-when button').forEach(b=>b.classList.toggle('on', (b.dataset.v==='back')===R.backfilled));
+  document.getElementById('f-backbucket').style.display = R.backfilled?'':'none';
+  document.querySelectorAll('#seg-bucket button').forEach(b=>b.classList.toggle('on', b.dataset.b===R.timeBucketManual));
   setWhenHint();
 }
 /* 커스텀 태그 저장 */
@@ -475,7 +498,8 @@ function onSlide(){
   document.getElementById('intzone').textContent=a[1];
   document.getElementById('intphrase').textContent=a[2];
 }
-function setWhen(v){ R.backfilled=(v==='back'); buildForm(); }
+function setWhen(v){ R.backfilled=(v==='back'); if(!R.backfilled)R.timeBucketManual=null; buildForm(); }
+function setBucket(b){ R.timeBucketManual=(R.timeBucketManual===b?null:b); buildForm(); }
 function setWhenHint(){
   const h=document.getElementById('backhint');
   if(!R.backfilled){h.textContent='';return}
@@ -488,7 +512,8 @@ function saveEvent(quick){
   R.memo=document.getElementById('memo').value.trim();
   R.ts = R.ts || now.toISOString();
   R.dow = R.dow || DOW[now.getDay()];
-  R.timeBucket = R.timeBucket || bucket(now.getHours());
+  if(R.backfilled && R.timeBucketManual) R.timeBucket = R.timeBucketManual;
+  else R.timeBucket = R.timeBucket || bucket(now.getHours());
   R.updatedAt = now.toISOString();
   const edited=R._edit; delete R._edit;
   const arr=load();
@@ -517,11 +542,37 @@ function go(id){
 function toast(t){ const el=document.getElementById('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),1800); }
 
 /* ---------- home ---------- */
-function renderHome(){
-  const arr=active(); const t=new Date().toDateString();
-  const n=arr.filter(e=>new Date(e.ts).toDateString()===t).length;
-  document.getElementById('todayline').innerHTML = n? `오늘 <b>${n}건</b> 기록` : '';
+function isIncomplete(e){
+  const tags=(e.aspects||[]).length+(e.causes||[]).length+(e.reactions||[]).length+(e.keep||[]).length+(e.types||[]).length;
+  return tags===0 && !(e.memo&&e.memo.trim()) && e.mood==null;
 }
+function renderHome(){
+  const arr=active(); const now=new Date(); const t=now.toDateString();
+  const todayEv=arr.filter(e=>new Date(e.ts).toDateString()===t);
+  document.getElementById('todayline').innerHTML = todayEv.length? `오늘 <b>${todayEv.length}건</b> 기록` : '';
+  // 미완성 이어채우기
+  const inc=arr.filter(isIncomplete).sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const il=document.getElementById('incompleteline');
+  if(inc.length){ il.style.display=''; il.innerHTML=`<div class="incline" onclick="editRecord('${inc[0].id}')">채우다 만 기록 <b>${inc.length}개</b> · 이어서 채우기 ›</div>`; }
+  else il.style.display='none';
+  // 저녁 스침 회수 넛지
+  const nd=document.getElementById('eveningnudge');
+  const joyToday=todayEv.some(e=>e.polarity==='기쁨');
+  const show = now.getHours()>=20 && !joyToday && localStorage.getItem('kyeol_nudge_dismiss')!==t;
+  if(show){ nd.style.display=''; nd.innerHTML=`<div class="nudge" onclick="startRecord('기쁨',true)">
+      <div class="nt">🌙 오늘 지나간 괜찮은 순간 하나만</div>
+      <div class="ns">스침도 기록 대상 — 잡아야 남습니다</div>
+      <button class="nx" onclick="event.stopPropagation();dismissNudge()">오늘 그만</button></div>`; }
+  else nd.style.display='none';
+  // 홈화면 추가 안내
+  const ih=document.getElementById('installhint');
+  const standalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone;
+  if(!standalone && !localStorage.getItem('kyeol_install_dismiss')){
+    ih.style.display=''; ih.innerHTML=`<div class="ihint"><span>홈 화면에 추가하면 앱처럼 빨라요 · 공유 → “홈 화면에 추가”</span>
+      <button onclick="localStorage.setItem('kyeol_install_dismiss','1');renderHome()">✕</button></div>`;
+  } else ih.style.display='none';
+}
+function dismissNudge(){ localStorage.setItem('kyeol_nudge_dismiss', new Date().toDateString()); renderHome(); }
 
 /* ---------- report ---------- */
 function within(arr,days){ const c=Date.now()-days*864e5; return arr.filter(e=>new Date(e.ts).getTime()>=c) }
