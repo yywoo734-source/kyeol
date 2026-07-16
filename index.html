@@ -870,11 +870,27 @@ async function syncNow(){
 
 async function cloudSignIn(){
   if(!sb) return;
-  const email=prompt('이메일 주소 — 로그인 링크를 보냅니다');
+  const email=(prompt('이메일 주소 입력 — 6자리 로그인 코드를 보냅니다')||'').trim();
   if(!email) return;
-  const { error } = await sb.auth.signInWithOtp({ email:email.trim(), options:{ emailRedirectTo: location.href.split('#')[0] } });
-  toast(error ? ('오류: '+error.message) : '메일함 확인 → 링크 클릭');
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ shouldCreateUser:true, emailRedirectTo: location.href.split('#')[0] } });
+  if(error){ toast('오류: '+error.message); return; }
+  localStorage.setItem('kyeol_pending_email', email);
+  toast('메일 확인 → 6자리 코드 입력');
+  renderCloud();
 }
+async function cloudVerify(){
+  if(!sb) return;
+  const email=localStorage.getItem('kyeol_pending_email');
+  if(!email){ renderCloud(); return; }
+  const code=((document.getElementById('otpcode')||{}).value||'').replace(/\D/g,'');
+  if(code.length<6){ toast('6자리 코드 입력'); return; }
+  const { error } = await sb.auth.verifyOtp({ email, token:code, type:'email' });
+  if(error){ toast('코드 오류 — 다시 확인'); return; }
+  localStorage.removeItem('kyeol_pending_email');
+  toast('로그인 완료 · 동기화 켜짐');
+  // onAuthStateChange가 renderCloud + syncNow 실행
+}
+function cloudCancel(){ localStorage.removeItem('kyeol_pending_email'); renderCloud(); }
 async function cloudSignOut(){ if(sb){ await sb.auth.signOut(); toast('로그아웃 — 로컬 데이터는 이 기기에 남음'); renderCloud(); } }
 
 function renderCloud(msg){
@@ -884,6 +900,16 @@ function renderCloud(msg){
     return;
   }
   if(!session){
+    const pending=localStorage.getItem('kyeol_pending_email');
+    if(pending){
+      el.innerHTML=`<div class="stat" style="margin-bottom:8px"><span style="font-weight:700">코드 입력</span><span class="goal"><span class="pill no">확인 대기</span></span></div>
+        <div class="muted-s" style="margin-bottom:10px"><b>${esc(pending)}</b> 로 보낸 <b>6자리 코드</b>를 입력하세요. 메일 안 오면 스팸함 확인.</div>
+        <input id="otpcode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6자리"
+          style="width:100%;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:12px;padding:14px;font:inherit;font-size:22px;letter-spacing:8px;text-align:center;margin-bottom:10px">
+        <button class="btn" style="background:var(--joy);color:#fff" onclick="cloudVerify()">코드 확인 · 로그인</button>
+        <button class="btn ghost" onclick="cloudCancel()">취소 / 다시 보내기</button>`;
+      return;
+    }
     el.innerHTML=`<div class="stat" style="margin-bottom:10px"><span style="font-weight:700">클라우드 동기화</span>
       <span class="goal"><span class="pill no">로그아웃</span></span></div>
       <div class="muted-s" style="margin-bottom:12px">로그인하면 기록이 클라우드에 백업되고 다른 기기와 동기화됩니다. 캐시 삭제·폰 교체에도 안전.</div>
